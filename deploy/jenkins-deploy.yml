@@ -1,0 +1,81 @@
+- hosts: jenkins_master
+  become: yes
+  tasks:
+  - name: Install java
+    apt:
+      update_cache: yes
+      name: openjdk-11-jre
+      state: present
+
+  - name: Import key
+    apt_key:
+      url: https://pkg.jenkins.io/debian-stable/jenkins.io.key
+      state: present
+
+  - name: Add repository
+    apt_repository:
+      repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+      state: present
+      filename: jenkins.list
+      update_cache: yes
+      
+  - name: Install jenkins
+    package:
+      name: jenkins
+      state: present
+  
+  - name: Disable jenkins setup wizard
+    lineinfile:
+      path: /etc/default/jenkins
+      line: 'JAVA_ARGS="-Djenkins.install.runSetupWizard=false"'
+      state: present
+        
+  - name: Copy SSH key
+    copy:
+      src: radon.pem
+      dest: /tmp/radon.pem
+      mode: 0600
+      owner: jenkins
+      group: jenkins
+        
+  - name: Copy groovy config
+    copy:
+      src: init.groovy
+      dest: /var/lib/jenkins/init.groovy
+      owner: jenkins
+      group: jenkins
+  
+  - name: Copy deploy server info
+    copy:
+      src: deploy_server_ip
+      dest: /tmp/deploy_server_ip
+      owner: jenkins
+      group: jenkins
+
+  - name: Restart jenkins
+    systemd:
+      state: restarted
+      name: jenkins
+        
+  - name: Slurp password file
+    slurp:
+      src: /var/lib/jenkins/secrets/initialAdminPassword
+    register: initialAdminPassword
+        
+  - debug: msg="the default admin password is {{ initialAdminPassword['content'] | b64decode }}"
+
+- name: Configure deploy machines
+  hosts: deploy
+  become: yes
+  tasks:
+    - name: Install apache
+      apt:
+        update_cache: yes
+        name: apache2
+        state: present
+    
+    - name: Change html folder owner
+      file: 
+        dest: /var/www/html
+        owner: ubuntu
+        recurse: yes

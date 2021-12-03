@@ -1,0 +1,9 @@
+[jenkins_master]
+%{ for ip in jenkins_master ~}
+${ip} ansible_user=ubuntu
+%{ endfor ~}
+
+[deploy]
+%{ for ip in deploy ~}
+${ip} ansible_user=ubuntu
+%{ endfor ~}
